@@ -15,7 +15,7 @@ All done.
 ### `version`
 The desired version of Qt to install.
 
-Default: `5.12.9` (Latest LTS at the time of writing)
+Default: `5.15.2` (Latest LTS at the time of writing)
 
 ### `host`
 This is the host platform of the Qt version you will be installing. It's unlikely that you will need to set this manually if you are just building.
@@ -80,13 +80,6 @@ Possible values: `qtcharts`, `qtdatavis3d`, `qtpurchasing`, `qtvirtualkeyboard`,
 
 Default: none
 
-### `mirror`
-Forces a different Qt mirror in case there is a problem with the default.
-
-If you have problems, you can try: `http://mirrors.ocf.berkeley.edu/qt/`
-
-Default: none
-
 ### `cached`
 If it is set to `true`, then Qt won't be downloaded, but the environment variables will be set, and essential build tools will be installed.
 
@@ -108,19 +101,43 @@ It can be used with [actions/cache](https://github.com/actions/cache), for examp
 
 Default: `false`
 
+### `setup-python`
+
+Set this to false if you want to skip using setup-python to find/download a valid python version. If you are on a self-hosted runner, you will probably need to set this to false because setup-python [requires a very specific environment to work](https://github.com/actions/setup-python#using-setup-python-with-a-self-hosted-runner).
+
+Default: `true`
+
+### `tools`
+
+Qt "tools" to be installed. I would recommend looking at [aqtinstall](https://github.com/miurahr/aqtinstall)'s instructions for this, as it is an experimental feature.
+Specify the tool name, tool version, and arch separated by commas, and separate multiple tools with spaces.
+
+Example value: 'tools_ifw,4.0,qt.tools.ifw.40 tools_qtcreator,4.13.2-0,qt.tools.qtcreator'
+
+### `set-env`
+Set this to false if you want to avoid setting environment variables for whatever reason.
+
+Default: `true`
+
+### `tools-only`
+
+Set this to true if you only want to install tools, and not Qt.
+
+Default: `false`
+
 ### `aqtversion`
 
 Version of [aqtinstall](https://github.com/miurahr/aqtinstall) to use, given in the format used by pip, for example: `==0.7.1`, `>=0.7.1`, `==0.7.*`. This is intended to be used to troubleshoot any bugs that might be caused or fixed by certain versions of aqtinstall.
 
-Default: `==0.9.7`
+Default: `==1.1.3`
 
 ### `py7zrversion`
 Version of py7zr in the same style as the aqtversion and intended to be used for the same purpose.
 
-Default: `==0.10.1`
+Default: `==0.14.0`
 
 ### `extra`
-This input can be used to append arguments to the end of the aqtinstall command in case of special needs.
+This input can be used to append arguments to the end of the aqtinstall command for any special purpose.
 
 Example value: `--external 7z`
 
@@ -130,25 +147,28 @@ Example value: `--external 7z`
     - name: Install Qt
       uses: jurplel/install-qt-action@v2
       with:
-        version: '5.12.9'
+        version: '5.15.2'
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2017_64'
         dir: '${{ github.workspace }}/example/'
         install-deps: 'true'
         modules: 'qtcharts qtwebengine'
-        mirror: 'http://mirrors.ocf.berkeley.edu/qt/'
         cached: 'false'
-        aqtversion: '==0.9.7'
-        py7zrversion: '==0.10.1'
+        setup-python: 'true'
+        tools: 'tools_ifw,4.0,qt.tools.ifw.40 tools_qtcreator,4.13.2-0,qt.tools.qtcreator'
+        set-env: 'false'
+        tools-only: 'false'
+        aqtversion: '==1.1.3'
+        py7zrversion: '==0.14.0'
         extra: '--external 7z'
 ```
 
 ## More info
+The Qt bin directory is appended to your `path` environment variable. `Qt5_DIR`/`Qt6_DIR` is also set appropriately for cmake.
+In addition, `QT_PLUGIN_PATH`, `QML2_IMPORT_PATH`, `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` are set accordingly. `IQTA_TOOLS` is set to the "Tools" directory if tools are installed as wlel.
 
-The Qt bin directory is added to your `path` environment variable. `Qt5_DIR` is also set appropriately for cmake. 
-
-Big thanks to the [aqtinstall](https://github.com/miurahr/aqtinstall/) developers for making this easy. Please go support them, they did all of the hard work here.
+Big thanks to the [aqtinstall](https://github.com/miurahr/aqtinstall/) developer for making this easy. Please go support [miurahr](https://github.com/miurahr/aqtinstall), he did all of the hard work here ([his liberapay](https://liberapay.com/miurahr)).
 
 This action is distributed under the [MIT license](LICENSE).
 

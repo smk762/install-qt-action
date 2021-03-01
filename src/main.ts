@@ -3,11 +3,20 @@ import * as glob from "glob";
 import * as compareVersions from "compare-versions";
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
+import * as setupPython from 'setup-python/lib/find-python'
 
 async function run() {
     try {
+      if (core.getInput("setup-python") == "true") {
+        // Use setup-python to ensure that python >=3.6 is installed
+        const installed = await setupPython.findPythonVersion('>=3.6', 'x64')
+        core.info(`Successfully setup ${installed.impl} (${installed.version})`)
+      }
+
       const dir = (core.getInput("dir") || process.env.RUNNER_WORKSPACE) + "/Qt";
       let version = core.getInput("version");
+      const tools = core.getInput("tools");
+      const setEnv = core.getInput("set-env");
 
       // Qt installer assumes basic requirements that are not installed by
       // default on Ubuntu.
@@ -34,7 +43,6 @@ async function run() {
         let host = core.getInput("host");
         const target = core.getInput("target");
         let arch = core.getInput("arch");
-        const mirror = core.getInput("mirror");
         const extra = core.getInput("extra");
         const modules = core.getInput("modules");
 
@@ -74,19 +82,11 @@ async function run() {
         }
 
         //set args
-        let args = ["-O", `${dir}`, `${version}`, `${host}`, `${target}`];
+        let args = [`${version}`, `${host}`, `${target}`];
         if (arch && ((host == "windows" || target == "android") || arch == "wasm_32")) {
           args.push(`${arch}`);
         }
-        if (mirror) {
-          args.push("-b");
-          args.push(mirror);
-        }
-        if (extra) {
-          extra.split(" ").forEach(function(string) {
-            args.push(string);
-          });
-        }
+
         if (modules) {
           args.push("-m");
           modules.split(" ").forEach(function(currentModule) {
@@ -94,24 +94,60 @@ async function run() {
           });
         }
 
-        //run aqtinstall with args
-        await exec.exec(`${pythonName} -m aqt install`, args);
+        let extraArgs = ["-O", `${dir}`]
+
+        if (extra) {
+          extra.split(" ").forEach(function(string) {
+            extraArgs.push(string);
+          });
+        }
+
+        args = args.concat(extraArgs);
+
+        //run aqtinstall with args, and install tools if requested
+        if (core.getInput("tools-only") != "true") {
+          await exec.exec(`${pythonName} -m aqt install`, args);
+        }
+        if (tools) {
+          tools.split(" ").forEach(async element => {
+            let elements = element.split(",");
+            await exec.exec(`${pythonName} -m aqt tool ${host} ${elements[0]} ${elements[1]} ${elements[2]}`, extraArgs);
+          });
+        }
       }
 
       //set environment variables
       let qtPath = dir + "/" + version;
       qtPath = glob.sync(qtPath + '/**/*')[0];
-
-      // If less than qt6, set qt5_dir variable, otherwise set qt6_dir variable
-      if (compareVersions.compare(version, '6.0.0', '<')) {
-        core.exportVariable('Qt5_Dir', qtPath); // Incorrect name that was fixed, but kept around so it doesn't break anything
-        core.exportVariable('Qt5_DIR', qtPath);
-      } else {
-        core.exportVariable('Qt6_DIR', qtPath);
+      if (setEnv == "true") {
+        if (tools) {
+            core.exportVariable('IQTA_TOOLS', dir + "/Tools");
+        }
+        if (process.platform == "linux") {
+            if (process.env.LD_LIBRARY_PATH) {
+                core.exportVariable('LD_LIBRARY_PATH', process.env.LD_LIBRARY_PATH + ":" + qtPath + "/lib");
+            } else {
+                core.exportVariable('LD_LIBRARY_PATH', qtPath + "/lib");
+            }
+        }
+        if (process.platform != "win32") {
+          if (process.env.PKG_CONFIG_PATH) {
+              core.exportVariable('PKG_CONFIG_PATH', process.env.PKG_CONFIG_PATH + ":" + qtPath + "/lib/pkgconfig");
+          } else {
+              core.exportVariable('PKG_CONFIG_PATH', qtPath + "/lib/pkgconfig");
+          }
       }
-      core.exportVariable('QT_PLUGIN_PATH', qtPath + '/plugins');
-      core.exportVariable('QML2_IMPORT_PATH', qtPath + '/qml');
-      core.addPath(qtPath + "/bin");
+        // If less than qt6, set qt5_dir variable, otherwise set qt6_dir variable
+        if (compareVersions.compare(version, '6.0.0', '<')) {
+          core.exportVariable('Qt5_Dir', qtPath); // Incorrect name that was fixed, but kept around so it doesn't break anything
+          core.exportVariable('Qt5_DIR', qtPath);
+        } else {
+          core.exportVariable('Qt6_DIR', qtPath);
+        }
+        core.exportVariable('QT_PLUGIN_PATH', qtPath + '/plugins');
+        core.exportVariable('QML2_IMPORT_PATH', qtPath + '/qml');
+        core.addPath(qtPath + "/bin");
+      }
     } catch (error) {
       core.setFailed(error.message);
     }
